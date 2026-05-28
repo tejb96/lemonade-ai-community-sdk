@@ -1,11 +1,20 @@
 project: lemonade-server
 
+path: /home/ubuntu/project
+
 backends:
-  - name: workshop
-    type: workshop
+  lxd:
+    systems:
+      - ubuntu-24.04:
+          username: ubuntu
+          vm: true
 
 suites:
   main/:
     summary: End-to-end lemonade-server SDK scenarios
     systems:
-      - ubuntu-24.04-64
+      - ubuntu-24.04
+    prepare-each: |
+      workshop remove ai-dev || true
+    restore-each: |
+      workshop remove ai-dev || true
