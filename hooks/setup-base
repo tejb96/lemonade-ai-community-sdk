@@ -7,13 +7,21 @@
 # the upstream embeddable tarball, so this hook only installs the runtime
 # system packages they depend on and wires up PATH / HF cache env vars for
 # every shell that runs in the workshop.
+#
+# Note: the profile.d heredoc below is intentionally unquoted (`<<EOF`, not
+# `<<'EOF'`) so ${SDK} expands at hook-run time into the SDK's literal install
+# path (e.g. /var/lib/workshop/sdk/lemonade-server). $SDK is a Workshop
+# hook-time variable; it is NOT set in the user-systemd environment, so a
+# quoted heredoc would write the literal "$SDK" into the file and lemond
+# launched via `bash -lc` would fail with "command not found". $PATH is
+# escaped (\$PATH) so it stays literal and expands at shell-source time.
 set -euo pipefail
 
 apt-get update -qq
 apt-get install -y --no-install-recommends ca-certificates curl
 
-cat > /etc/profile.d/lemonade.sh <<'EOF'
-export PATH="$SDK/bin:$PATH"
+cat > /etc/profile.d/lemonade.sh <<EOF
+export PATH="${SDK}/bin:\$PATH"
 export LEMONADE_CACHE_DIR=/home/workshop/.cache/lemonade
 export HF_HOME=/home/workshop/.cache/huggingface
 export HF_HUB_CACHE=/home/workshop/.cache/huggingface/hub

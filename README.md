@@ -2,7 +2,7 @@
 
 A community [Canonical Workshop](https://documentation.ubuntu.com/canonical-workshop/latest/) SDK that installs and manages [Lemonade Server](https://lemonade-server.ai/) — a lightweight, open-source local LLM inference server — inside a workshop environment.
 
-> **Status: Phase 2 (reproducible upstream packaging).** Lemonade is now installed from the upstream embeddable tarball — no PPA dependency, no in-container Launchpad calls, no DNS requirement at workshop install time.
+> **Status: Phase 2.1 (reproducible upstream packaging, verified end-to-end).** Lemonade is installed from the upstream embeddable tarball — no PPA dependency, no in-container Launchpad calls. Acceptance criteria (pack, launch, health, model pull, refresh persistence) all pass on a clean checkout.
 
 ## What this SDK provides
 
@@ -147,6 +147,58 @@ Phase 2 ships `amd64` only, sourced from the upstream `lemonade-embeddable-*-ubu
 
 - The server binds to `localhost` by default. Change `host` to `0.0.0.0` only on trusted networks and set `LEMONADE_API_KEY`.
 - No API key is configured out of the box inside a workshop — this is intentional for local development. See the [Lemonade configuration docs](https://lemonade-server.ai/docs/guide/configuration/#api-key-and-security) for production hardening.
+
+## Networking
+
+Workshop runs its containers on a dedicated `workshopbr0` bridge. On hosts that also run Docker and/or have UFW with restrictive defaults, `workshopbr0` may end up with no outbound IPv4 connectivity (only IPv6 SLAAC), which causes `apt-get update` inside `setup-base` and `lemonade pull <model>` to hang. Workshop will surface this via `workshop warnings`.
+
+Pick one of:
+
+```bash
+# Simplest: allow all routed traffic through the host
+sudo ufw default allow routed && sudo ufw reload
+
+# Or surgically open just the workshop bridge
+sudo ufw allow in on workshopbr0
+sudo ufw route allow in on workshopbr0
+sudo ufw route allow out on workshopbr0
+sudo ufw reload
+
+# Or, if Docker's DOCKER-USER chain is the culprit, what Workshop itself recommends
+sudo nft insert rule ip filter DOCKER-USER iifname workshopbr0 accept
+sudo nft insert rule ip filter DOCKER-USER oifname workshopbr0 \
+    ct state related,established accept
+```
+
+The nft rules don't persist across reboots — drop them into `/etc/nftables.conf` or `/etc/ufw/before.rules` if you need persistence.
+
+## Verifying a local build
+
+The canonical recipe for end-to-end testing without publishing to the SDK Store:
+
+```bash
+# 1. Pack and stage in the try area
+cd lemonade-ai-community-sdk
+sdkcraft clean && sdkcraft try
+
+# 2. Launch a consumer workshop pointed at the try-area artifact
+mkdir -p /tmp/ai-dev && cp examples/workshop.yaml /tmp/ai-dev/
+cd /tmp/ai-dev
+workshop launch ai-dev --verbose --wait-on-error
+workshop info        # expect: status: ready
+
+# 3. Health endpoint reachable from the host through the tunnel slot
+curl -sf http://127.0.0.1:13305/api/v1/health
+# expect: {"status":"ok","version":"10.6.0",...}
+
+# 4. Pull a small model and confirm it survives a refresh
+workshop run ai-dev -- pull Qwen3-0.6B-GGUF
+workshop refresh ai-dev
+workshop exec ai-dev -- bash -c 'lemonade list | grep Qwen3-0.6B-GGUF'
+# expect a "Yes" in the Downloaded column
+```
+
+If step 2 hangs at `setup-base`'s `apt-get update`, see the Networking section above.
 
 ## License
 

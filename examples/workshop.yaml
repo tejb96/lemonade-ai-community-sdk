@@ -6,11 +6,11 @@ base: ubuntu@24.04
 # API, so you can point any OpenAI client at http://localhost:13305/v1.
 
 sdks:
-  - name: lemonade-server
-    channel: latest/edge
-    # During local development before this SDK is published to the SDK Store,
-    # replace the two lines above with:
-    #   - name: try-lemonade-server
+  - name: try-lemonade-server
+    # Defaults to the local try-area artifact produced by `sdkcraft try`.
+    # Once this SDK is published to the SDK Store, replace the line above with:
+    #   - name: lemonade-server
+    #     channel: latest/edge
 
   # Expose the Lemonade HTTP API to the host. Declaring a tunnel plug on the
   # system SDK with the same name as the lemonade-server tunnel slot

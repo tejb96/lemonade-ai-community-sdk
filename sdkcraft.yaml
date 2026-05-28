@@ -56,20 +56,36 @@ slots:
 # workshop install time. `service-files` ships the systemd user-service unit
 # alongside the binaries.
 #
-# The `organize:` map relocates the tarball's top-level directory to a flat
-# `bin/` (lemond, lemonade) + `bin/resources/` layout. The latter is required
-# because `lemond` resolves its static resources relative to its own binary
-# directory; putting them anywhere else breaks backend version pinning.
+# The `organize:` map relocates the tarball contents to a flat
+# `bin/` (lemond, lemonade) + `bin/resources/` layout. Two things to know:
+#
+#   1. craft-parts' tar source handler strips the common leading directory at
+#      extraction, so after the pull step the part's install dir contains
+#      `lemond`, `lemonade`, `LICENSE`, `resources/` at the root -- NOT
+#      `lemonade-embeddable-<version>-ubuntu-x64/lemond` etc. organize keys
+#      must therefore reference the stripped paths.
+#
+#   2. ${CRAFT_PROJECT_VERSION} expansion works in `source:` (proven in
+#      production), but NOT inside `organize:` dictionary keys on sdkcraft
+#      0.1.14 / craft-parts 1.25. Even if it did, point 1 makes it moot.
+#
+#   3. Resources MUST live next to the `lemond` binary (`bin/resources/`),
+#      not at the SDK root, because `lemond` looks for them relative to its
+#      own binary's directory. Putting them anywhere else breaks backend
+#      version pinning and triggers a `Could not mount static files from ...`
+#      warning at startup.
+#
+# `LICENSE` is already at the install root after the prefix strip, so it
+# needs no organize entry -- it's pulled in by `prime:` directly.
 parts:
   lemonade:
     plugin: dump
     source: https://github.com/lemonade-sdk/lemonade/releases/download/v${CRAFT_PROJECT_VERSION}/lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64.tar.gz
     source-type: tar
     organize:
-      lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64/lemond:    bin/lemond
-      lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64/lemonade:  bin/lemonade
-      lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64/LICENSE:   LICENSE
-      lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64/resources: bin/resources
+      lemond: bin/lemond
+      lemonade: bin/lemonade
+      resources: bin/resources
     prime:
       - bin/lemond
       - bin/lemonade
