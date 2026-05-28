@@ -1,205 +1,312 @@
 # lemonade-server Workshop SDK
 
-A community [Canonical Workshop](https://documentation.ubuntu.com/canonical-workshop/latest/) SDK that installs and manages [Lemonade Server](https://lemonade-server.ai/) — a lightweight, open-source local LLM inference server — inside a workshop environment.
+Run Lemonade Server inside Canonical Workshops with persistent model caching, GPU acceleration support, and an OpenAI-compatible local inference API.
 
-> **Status: Phase 2.1 (reproducible upstream packaging, verified end-to-end).** Lemonade is installed from the upstream embeddable tarball — no PPA dependency, no in-container Launchpad calls. Acceptance criteria (pack, launch, health, model pull, refresh persistence) all pass on a clean checkout.
+This community SDK packages [Lemonade Server](https://lemonade-server.ai/) for the Ubuntu Workshop ecosystem using reproducible upstream binaries instead of PPAs or runtime repository configuration.
 
-## What this SDK provides
+> Experimental but functional. Tested on Ubuntu Server 26.04 (amd64) using CPU fallback inference.
 
-- **Lemonade** installed from the upstream `lemonade-embeddable-<version>-ubuntu-x64.tar.gz`, packaged as a deterministic SDK part — no PPA, no apt repository configuration at install time.
-- **lemond** running as a systemd user service, auto-started on workshop launch.
-- Backend binaries (llama.cpp, whisper.cpp, sd.cpp, kokoro, etc.) are downloaded by `lemond` from upstream GitHub on first use; downloads land inside `model-cache` and persist across refreshes.
-- A persistent **model cache** via the `model-cache` mount plug.
-- A persistent **Hugging Face cache** via the `huggingface-cache` mount plug — Lemonade's default `models_dir: "auto"` resolves under `~/.cache/huggingface`, so this is what actually keeps downloaded weights across refreshes.
-- An OpenAI-compatible REST API on port 13305, exposed through a `tunnel` slot named `lemonade-api`.
+---
 
-## Quick start
+# Features
 
-### 1. Build and try locally
+- Reproducible SDK packaging using upstream Lemonade embeddable tarballs
+- OpenAI-compatible REST API exposed through Workshop tunnels
+- Persistent model and Hugging Face caches across refreshes
+- Automatic backend selection for ROCm, Vulkan, Ryzen AI, and CPU fallback
+- User-level `lemond` systemd service management
+- Compatible with local LLM workflows using Qwen, Llama, Gemma, and GGUF models
+- No Launchpad or PPA dependency during workshop installation
+
+---
+
+# Quick Start
+
+## 1. Build the SDK locally
 
 ```bash
-# Pack the SDK and copy the resulting artifacts into your local "try area".
-# This is the local equivalent of publishing to the SDK Store.
 sdkcraft try
 ```
 
-`sdkcraft try` packs `lemonade-server_amd64_ubuntu@24.04.sdk` into the try area and makes it referenceable as `try-lemonade-server` from any workshop definition.
+This packs the SDK and stages it into the local Workshop "try area" as:
 
-### 2. Launch a workshop that uses it
+```text
+try-lemonade-server
+```
 
-Drop a `workshop.yaml` into your project directory (the layout below mirrors `examples/workshop.yaml`):
+---
+
+## 2. Create a workshop
+
+Create a `workshop.yaml`:
 
 ```yaml
 name: ai-dev
 base: ubuntu@24.04
+
 sdks:
   - name: try-lemonade-server
+
   - name: system
     plugs:
       lemonade-api:
         interface: tunnel
         endpoint: localhost:13305
+
 actions:
   status: lemonade status
   pull: lemonade pull "$@"
   list: lemonade list
 ```
 
-Then launch:
+Launch the workshop:
 
 ```bash
 workshop launch --verbose --wait-on-error
-workshop info        # status: ready
+workshop info
 ```
 
-### 3. Pull a model and chat
+Expected status:
+
+```text
+ready
+```
+
+---
+
+## 3. Pull and run a model
 
 ```bash
 workshop run ai-dev -- pull Qwen3-0.6B-GGUF
 workshop run ai-dev -- list
 workshop exec ai-dev -- lemonade run Qwen3-0.6B-GGUF
-# The Lemonade web UI is reachable from the host at http://localhost:13305
 ```
 
-> First model pulls and any `*_bin: latest` resolution require outbound HTTPS to `github.com` and the Hugging Face Hub from inside the workshop. The SDK install itself does not need internet — the embeddable tarball is fetched once at `sdkcraft pack` time on the build machine.
+The Lemonade API and web UI will be available from the host at:
 
-## Using the example workshop definition
+```text
+http://localhost:13305
+```
+
+---
+
+# Persistence
+
+The SDK persists downloaded models and backend binaries using Workshop mount plugs.
+
+| Mount               | Purpose                                            |
+| ------------------- | -------------------------------------------------- |
+| `model-cache`       | Lemonade config, downloaded backends, local models |
+| `huggingface-cache` | Hugging Face model weights and cache               |
+
+This allows models and configuration to survive workshop refreshes automatically.
+
+---
+
+# GPU and Backend Support
+
+`lemond` automatically selects the best available backend at startup.
+
+| Hardware           | Typical Backend   |
+| ------------------ | ----------------- |
+| AMD GPU            | `rocm`            |
+| NVIDIA / Intel GPU | `vulkan`          |
+| AMD Ryzen AI NPU   | `ryzenai` / `flm` |
+| CPU fallback       | `cpu`             |
+
+You can override backend selection manually:
 
 ```bash
-cp examples/workshop.yaml workshop.yaml
-workshop launch
+workshop exec ai-dev -- lemonade config set llamacpp.backend=vulkan
 ```
 
-The shipped example targets `latest/edge` from the SDK Store. Until this SDK is published, replace the SDK reference with `try-lemonade-server` (the comment in the example file shows exactly how).
+---
 
-## SDK internals
+# Configuration
 
-### Directory layout
+The SDK creates a default `config.json` on first launch only. Subsequent refreshes preserve user modifications.
 
-```
-lemonade-server/
-├── sdkcraft.yaml             # SDK definition (lemonade + service-files parts)
-├── service/
-│   └── lemond.service        # systemd user unit (shipped as a part)
-├── hooks/
-│   ├── setup-base            # root: install runtime deps (ca-certificates, curl), set PATH and HF env
-│   ├── setup-project         # workshop user: write minimal config.json, start lemond as user service
-│   └── check-health          # single-shot probe of /api/v1/health; defers retry to Workshop
-├── tests/
-│   └── spread/
-│       └── spread.yaml       # placeholder (real tests land in Phase 3)
-└── examples/
-    └── workshop.yaml         # ready-to-use consumer workshop definition
-```
-
-There are no `save-state` / `restore-state` hooks: persistent data lives in the `model-cache` and `huggingface-cache` mount plugs, which Workshop preserves across refreshes by definition (this is the pattern the [Workshop best-practices guide](https://documentation.ubuntu.com/canonical-workshop/latest/explanation/sdks/best-practices/#sdk-dependencies) explicitly recommends).
-
-### Plugs and slots
-
-| Name                 | Type   | Purpose                                                                             |
-| -------------------- | ------ | ----------------------------------------------------------------------------------- |
-| `model-cache`        | mount  | Persists `~/.cache/lemonade` (config, user models, backend binaries) across refresh |
-| `huggingface-cache`  | mount  | Persists `~/.cache/huggingface` (the default `models_dir: "auto"` location)         |
-| `gpu`                | gpu    | Enables ROCm / Vulkan hardware-accelerated inference                                |
-| `lemonade-api`       | tunnel | Exposes port 13305; pair with a `system` tunnel plug of the same name on the host    |
-
-### Hooks
-
-| Hook            | Runs as  | When                            |
-| --------------- | -------- | ------------------------------- |
-| `setup-base`    | root     | First install and every refresh |
-| `setup-project` | workshop | Every launch and refresh        |
-| `check-health`  | root     | Post-launch / post-refresh      |
-
-### Configuration
-
-The SDK writes a sensible `config.json` on first launch only — subsequent refreshes preserve user edits. You can customise it at any time with the `lemonade config set` command inside the workshop:
+Examples:
 
 ```bash
 # Increase context window
 workshop exec ai-dev -- lemonade config set ctx_size=8192
 
-# Pin llamacpp to a specific Vulkan build
+# Pin a specific Vulkan backend build
 workshop exec ai-dev -- lemonade config set llamacpp.vulkan_bin=b8664
 
-# Accept connections from other machines on the network
+# Expose the API on the network
 workshop exec ai-dev -- lemonade config set host=0.0.0.0
 ```
 
-Changes are persisted automatically because `config.json` lives inside the `model-cache` mount.
+Configuration persists automatically because it lives inside the mounted cache directory.
 
-## Backends
+---
 
-Lemonade supports multiple inference backends. `lemond` probes available hardware on startup and selects the appropriate backend automatically — the SDK no longer runs its own `lspci` detection. Override per-backend at any time with `lemonade config set llamacpp.backend=...`.
-
-| Hardware              | Typical backend       |
-| --------------------- | --------------------- |
-| AMD GPU (dGPU)        | `rocm`                |
-| NVIDIA / Intel GPU    | `vulkan`              |
-| AMD Ryzen AI NPU      | `flm` / `ryzenai`     |
-| CPU fallback          | `cpu`                 |
-
-## Platforms
-
-Phase 2 ships `amd64` only, sourced from the upstream `lemonade-embeddable-*-ubuntu-x64.tar.gz` artifact. arm64 will be re-introduced once upstream publishes a Linux arm64 build.
-
-## Security notes
-
-- The server binds to `localhost` by default. Change `host` to `0.0.0.0` only on trusted networks and set `LEMONADE_API_KEY`.
-- No API key is configured out of the box inside a workshop — this is intentional for local development. See the [Lemonade configuration docs](https://lemonade-server.ai/docs/guide/configuration/#api-key-and-security) for production hardening.
-
-## Networking
-
-Workshop runs its containers on a dedicated `workshopbr0` bridge. On hosts that also run Docker and/or have UFW with restrictive defaults, `workshopbr0` may end up with no outbound IPv4 connectivity (only IPv6 SLAAC), which causes `apt-get update` inside `setup-base` and `lemonade pull <model>` to hang. Workshop will surface this via `workshop warnings`.
-
-Pick one of:
+# Example Workflow
 
 ```bash
-# Simplest: allow all routed traffic through the host
-sudo ufw default allow routed && sudo ufw reload
+# Launch workshop
+workshop launch ai-dev
 
-# Or surgically open just the workshop bridge
+# Pull a model
+workshop run ai-dev -- pull Qwen3-0.6B-GGUF
+
+# Verify health endpoint
+curl http://127.0.0.1:13305/api/v1/health
+
+# Refresh workshop
+workshop refresh ai-dev
+
+# Confirm model persisted
+workshop exec ai-dev -- lemonade list
+```
+
+---
+
+# SDK Architecture
+
+## Directory Layout
+
+```text
+lemonade-server/
+├── sdkcraft.yaml
+├── service/
+│   └── lemond.service
+├── hooks/
+│   ├── setup-base
+│   ├── setup-project
+│   └── check-health
+├── examples/
+│   └── workshop.yaml
+└── tests/
+    └── spread/
+```
+
+---
+
+## Hooks
+
+| Hook            | Runs As       | Purpose                                      |
+| --------------- | ------------- | -------------------------------------------- |
+| `setup-base`    | root          | Install runtime dependencies and environment |
+| `setup-project` | workshop user | Configure Lemonade and start `lemond`        |
+| `check-health`  | root          | Validate API readiness                       |
+
+---
+
+## Tunnel Slot
+
+The SDK exposes the Lemonade API using a Workshop tunnel slot:
+
+| Slot           | Port    |
+| -------------- | ------- |
+| `lemonade-api` | `13305` |
+
+Consumers attach this slot through the `system` SDK using a matching tunnel plug.
+
+---
+
+# Networking Notes
+
+Workshop containers run on the `workshopbr0` bridge.
+
+On systems using Docker and/or restrictive UFW policies, outbound IPv4 traffic may be blocked, causing:
+
+- `apt-get update` hangs
+- failed model downloads
+- stalled backend downloads
+
+Possible fixes:
+
+```bash
+sudo ufw default allow routed
+sudo ufw reload
+```
+
+Or:
+
+```bash
 sudo ufw allow in on workshopbr0
 sudo ufw route allow in on workshopbr0
 sudo ufw route allow out on workshopbr0
 sudo ufw reload
+```
 
-# Or, if Docker's DOCKER-USER chain is the culprit, what Workshop itself recommends
+If Docker's `DOCKER-USER` chain is interfering:
+
+```bash
 sudo nft insert rule ip filter DOCKER-USER iifname workshopbr0 accept
 sudo nft insert rule ip filter DOCKER-USER oifname workshopbr0 \
     ct state related,established accept
 ```
 
-The nft rules don't persist across reboots — drop them into `/etc/nftables.conf` or `/etc/ufw/before.rules` if you need persistence.
+---
 
-## Verifying a local build
-
-The canonical recipe for end-to-end testing without publishing to the SDK Store:
+# Verifying a Local Build
 
 ```bash
-# 1. Pack and stage in the try area
-cd lemonade-ai-community-sdk
+# Build and stage locally
 sdkcraft clean && sdkcraft try
 
-# 2. Launch a consumer workshop pointed at the try-area artifact
-mkdir -p /tmp/ai-dev && cp examples/workshop.yaml /tmp/ai-dev/
+# Create test workshop
+mkdir -p /tmp/ai-dev
+cp examples/workshop.yaml /tmp/ai-dev/
 cd /tmp/ai-dev
+
+# Launch
 workshop launch ai-dev --verbose --wait-on-error
-workshop info        # expect: status: ready
 
-# 3. Health endpoint reachable from the host through the tunnel slot
+# Verify API
 curl -sf http://127.0.0.1:13305/api/v1/health
-# expect: {"status":"ok","version":"10.6.0",...}
 
-# 4. Pull a small model and confirm it survives a refresh
+# Pull model
 workshop run ai-dev -- pull Qwen3-0.6B-GGUF
+
+# Refresh workshop
 workshop refresh ai-dev
+
+# Verify persistence
 workshop exec ai-dev -- bash -c 'lemonade list | grep Qwen3-0.6B-GGUF'
-# expect a "Yes" in the Downloaded column
 ```
 
-If step 2 hangs at `setup-base`'s `apt-get update`, see the Networking section above.
+---
 
-## License
+# Platforms
 
-Apache-2.0 — same as Lemonade Server upstream.
+Current support:
+
+- Ubuntu Server 26.04
+- amd64
+
+arm64 support will return once upstream Linux arm64 binaries are available.
+
+---
+
+# Security Notes
+
+By default, Lemonade binds to:
+
+```text
+localhost
+```
+
+To expose the API externally:
+
+```bash
+workshop exec ai-dev -- lemonade config set host=0.0.0.0
+```
+
+If exposing beyond local development, configure:
+
+```text
+LEMONADE_API_KEY
+```
+
+See the official Lemonade documentation for production hardening guidance.
+
+---
+
+# License
+
+Apache-2.0, matching Lemonade Server upstream.
