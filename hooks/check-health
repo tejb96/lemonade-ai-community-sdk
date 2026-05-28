@@ -3,34 +3,26 @@
 # the SDK is fully operational. Must call 'workshopctl set-health' exactly once.
 #
 # Health states:
-#   okay    — lemond is running and responding to the status endpoint
-#   waiting — lemond is starting up; Workshop will retry every second (up to 10x)
-#   error   — something went wrong; message is shown in 'workshop changes'
+#   okay    — lemond is running and responding on /api/v1/health
+#   waiting — lemond is starting up; Workshop retries every second (up to 10x)
+#             before auto-promoting to 'error'.
 #
-# Phase 1 note: this hook still implements its own short polling loop; Phase 3
-# of the realignment plan will reduce it to a single-shot probe and lean on
-# Workshop's own retry semantics.
+# Phase 2: this hook is intentionally single-shot. The previous 30 s in-hook
+# polling loop duplicated Workshop's own retry semantics and made failure modes
+# harder to read. We let Workshop retry 'waiting' and promote to 'error' itself.
 set -euo pipefail
 
 PORT=13305
-STATUS_URL="http://127.0.0.1:${PORT}/api/v0/status"
-MAX_WAIT=30
-INTERVAL=2
+HEALTH_URL="http://127.0.0.1:${PORT}/api/v1/health"
 
-if ! sudo -u workshop --login systemctl --user is-active --quiet lemond 2>/dev/null; then
+if ! sudo -u workshop --login systemctl --user is-active --quiet lemond; then
     workshopctl set-health waiting "lemond service is not yet active"
     exit 0
 fi
 
-elapsed=0
-while [ "${elapsed}" -lt "${MAX_WAIT}" ]; do
-    if sudo -u workshop --login curl -sf --max-time 3 "${STATUS_URL}" >/dev/null 2>&1; then
-        workshopctl set-health okay
-        exit 0
-    fi
-    sleep "${INTERVAL}"
-    elapsed=$((elapsed + INTERVAL))
-done
+if sudo -u workshop --login curl -sf --max-time 3 "${HEALTH_URL}" >/dev/null 2>&1; then
+    workshopctl set-health okay
+    exit 0
+fi
 
-journal_tail=$(sudo -u workshop --login journalctl --user -u lemond -n 20 --no-pager 2>/dev/null || echo "(no journal)")
-workshopctl set-health error "lemond did not respond on :${PORT} after ${MAX_WAIT}s. Last log lines: ${journal_tail}"
+workshopctl set-health waiting "lemond not yet responding on :${PORT}/api/v1/health"

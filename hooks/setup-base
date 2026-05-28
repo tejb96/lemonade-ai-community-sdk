@@ -3,33 +3,20 @@
 # or refresh). Operations here become part of the workshop snapshot so they are
 # fast on subsequent launches.
 #
-# Responsibilities:
-#   1. Add the Lemonade stable PPA
-#   2. Install lemonade-server (and lemonade CLI)
-#   3. Set PATH so 'lemonade' and 'lemond' are available to all users
-#   4. Disable the system-level lemond.service (we manage our own user unit)
+# Phase 2: the Lemonade binaries themselves are now shipped as a `dump` part on
+# the upstream embeddable tarball, so this hook only installs the runtime
+# system packages they depend on and wires up PATH / HF cache env vars for
+# every shell that runs in the workshop.
 set -euo pipefail
 
-# ── 1. PPA & package install ──────────────────────────────────────────────────
-echo "[lemonade-sdk] Adding lemonade-team/stable PPA..."
-add-apt-repository -y ppa:lemonade-team/stable
 apt-get update -qq
-apt-get install -y --no-install-recommends lemonade-server
+apt-get install -y --no-install-recommends ca-certificates curl
 
-# ── 2. PATH: make CLI tools available to all shells ───────────────────────────
-# /usr/bin is already on PATH; guard against double-entry on re-runs.
-if ! grep -q 'lemonade' /etc/profile.d/lemonade.sh 2>/dev/null; then
-    cat > /etc/profile.d/lemonade.sh <<'EOF'
-# Lemonade SDK — added by Workshop SDK setup-base hook
-# CLI tools are in /usr/bin after PPA install; this file exists as a marker.
-export LEMONADE_SDK=1
+cat > /etc/profile.d/lemonade.sh <<'EOF'
+export PATH="$SDK/bin:$PATH"
+export LEMONADE_CACHE_DIR=/home/workshop/.cache/lemonade
+export HF_HOME=/home/workshop/.cache/huggingface
+export HF_HUB_CACHE=/home/workshop/.cache/huggingface/hub
 EOF
-fi
-
-# ── 3. Disable system-level service — Workshop runs its own user unit ─────────
-# The PPA enables lemond.service globally; we don't want it fighting ours.
-if systemctl is-enabled --quiet lemond 2>/dev/null; then
-    systemctl disable --now lemond || true
-fi
 
 echo "[lemonade-sdk] setup-base complete."

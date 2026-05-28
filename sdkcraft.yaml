@@ -51,11 +51,31 @@ slots:
     endpoint: 13305
 
 # -- Parts ------------------------------------------------------------------
-# Phase 1 keeps the PPA install in setup-base. Phase 2 will replace this with
-# a `dump` part on the upstream lemonade-embeddable Linux tarball, removing
-# the apt dependency entirely. We ship only the systemd user-service unit
-# file as a prebuilt part for now.
+# Phase 2: the `lemonade` part dumps the upstream lemonade-embeddable Linux
+# tarball verbatim into the SDK tree, so there is no apt / PPA dependency at
+# workshop install time. `service-files` ships the systemd user-service unit
+# alongside the binaries.
+#
+# The `organize:` map relocates the tarball's top-level directory to a flat
+# `bin/` (lemond, lemonade) + `bin/resources/` layout. The latter is required
+# because `lemond` resolves its static resources relative to its own binary
+# directory; putting them anywhere else breaks backend version pinning.
 parts:
+  lemonade:
+    plugin: dump
+    source: https://github.com/lemonade-sdk/lemonade/releases/download/v${CRAFT_PROJECT_VERSION}/lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64.tar.gz
+    source-type: tar
+    organize:
+      lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64/lemond:    bin/lemond
+      lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64/lemonade:  bin/lemonade
+      lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64/LICENSE:   LICENSE
+      lemonade-embeddable-${CRAFT_PROJECT_VERSION}-ubuntu-x64/resources: bin/resources
+    prime:
+      - bin/lemond
+      - bin/lemonade
+      - bin/resources
+      - LICENSE
+
   service-files:
     plugin: dump
     source: service/

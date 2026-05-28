@@ -2,13 +2,13 @@
 
 A community [Canonical Workshop](https://documentation.ubuntu.com/canonical-workshop/latest/) SDK that installs and manages [Lemonade Server](https://lemonade-server.ai/) — a lightweight, open-source local LLM inference server — inside a workshop environment.
 
-> **Status: Phase 1 (structural alignment).** The hook layout, plug/slot vocabulary, and consumer example are now in line with the documented Workshop SDK contract. Lemonade itself is still installed from the upstream PPA in `setup-base`; switching to the prebuilt `lemonade-embeddable` tarball part is Phase 2 of the realignment plan.
+> **Status: Phase 2 (reproducible upstream packaging).** Lemonade is now installed from the upstream embeddable tarball — no PPA dependency, no in-container Launchpad calls, no DNS requirement at workshop install time.
 
 ## What this SDK provides
 
-- **lemonade-server** installed via the official stable PPA (`ppa:lemonade-team/stable`) — Phase 2 will replace this with a reproducible upstream tarball part.
+- **Lemonade** installed from the upstream `lemonade-embeddable-<version>-ubuntu-x64.tar.gz`, packaged as a deterministic SDK part — no PPA, no apt repository configuration at install time.
 - **lemond** running as a systemd user service, auto-started on workshop launch.
-- Best-effort GPU/NPU backend detection at setup time (`cpu` → `vulkan` → `rocm` → `npu`); the result is written into a default `config.json`.
+- Backend binaries (llama.cpp, whisper.cpp, sd.cpp, kokoro, etc.) are downloaded by `lemond` from upstream GitHub on first use; downloads land inside `model-cache` and persist across refreshes.
 - A persistent **model cache** via the `model-cache` mount plug.
 - A persistent **Hugging Face cache** via the `huggingface-cache` mount plug — Lemonade's default `models_dir: "auto"` resolves under `~/.cache/huggingface`, so this is what actually keeps downloaded weights across refreshes.
 - An OpenAI-compatible REST API on port 13305, exposed through a `tunnel` slot named `lemonade-api`.
@@ -61,6 +61,8 @@ workshop exec ai-dev -- lemonade run Qwen3-0.6B-GGUF
 # The Lemonade web UI is reachable from the host at http://localhost:13305
 ```
 
+> First model pulls and any `*_bin: latest` resolution require outbound HTTPS to `github.com` and the Hugging Face Hub from inside the workshop. The SDK install itself does not need internet — the embeddable tarball is fetched once at `sdkcraft pack` time on the build machine.
+
 ## Using the example workshop definition
 
 ```bash
@@ -76,13 +78,13 @@ The shipped example targets `latest/edge` from the SDK Store. Until this SDK is 
 
 ```
 lemonade-server/
-├── sdkcraft.yaml             # SDK definition
+├── sdkcraft.yaml             # SDK definition (lemonade + service-files parts)
 ├── service/
 │   └── lemond.service        # systemd user unit (shipped as a part)
 ├── hooks/
-│   ├── setup-base            # root: PPA install, PATH, disable system service
-│   ├── setup-project         # workshop user: GPU detect, config.json, start unit
-│   └── check-health          # poll /api/v0/status; report okay / waiting / error
+│   ├── setup-base            # root: install runtime deps (ca-certificates, curl), set PATH and HF env
+│   ├── setup-project         # workshop user: write minimal config.json, start lemond as user service
+│   └── check-health          # single-shot probe of /api/v1/health; defers retry to Workshop
 ├── tests/
 │   └── spread/
 │       └── spread.yaml       # placeholder (real tests land in Phase 3)
@@ -128,9 +130,9 @@ Changes are persisted automatically because `config.json` lives inside the `mode
 
 ## Backends
 
-Lemonade supports multiple inference backends. The SDK auto-selects one at `setup-project` time based on detected hardware, but you can override it later with `lemonade config set`.
+Lemonade supports multiple inference backends. `lemond` probes available hardware on startup and selects the appropriate backend automatically — the SDK no longer runs its own `lspci` detection. Override per-backend at any time with `lemonade config set llamacpp.backend=...`.
 
-| Hardware              | Auto-detected backend |
+| Hardware              | Typical backend       |
 | --------------------- | --------------------- |
 | AMD GPU (dGPU)        | `rocm`                |
 | NVIDIA / Intel GPU    | `vulkan`              |
@@ -139,7 +141,7 @@ Lemonade supports multiple inference backends. The SDK auto-selects one at `setu
 
 ## Platforms
 
-Phase 1 ships `amd64` only. Upstream Lemonade does not currently publish a Linux arm64 binary or PPA suite; arm64 support will land once upstream provides one or once the SDK adopts a source-built part.
+Phase 2 ships `amd64` only, sourced from the upstream `lemonade-embeddable-*-ubuntu-x64.tar.gz` artifact. arm64 will be re-introduced once upstream publishes a Linux arm64 build.
 
 ## Security notes
 
