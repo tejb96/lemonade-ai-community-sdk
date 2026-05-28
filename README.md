@@ -294,7 +294,18 @@ sdkcraft test
 
 # CI
 
-Pull requests and pushes to `main` run [`.github/workflows/build.yml`](.github/workflows/build.yml): `sdkcraft pack` plus the spread suite above on an `ubuntu-24.04` runner with LXD. Upstream version bumps are proposed by [Renovate](renovate.json) from [lemonade-sdk/lemonade](https://github.com/lemonade-sdk/lemonade) releases (updates `VERSION` and the `version:` field in `sdkcraft.yaml`).
+Pull requests and pushes to `main` run [`.github/workflows/build.yml`](.github/workflows/build.yml): **`sdkcraft pack` only** on an `ubuntu-24.04` runner with LXD. Spread tests are not run on GitHub-hosted runners because `sdkcraft test` needs a local Workshop snap under `tests/` while Workshop remains private.
+
+Run the full test gate on your **build server** (where Workshop is installed) before merging:
+
+```bash
+./scripts/sync-version.sh
+sdkcraft test
+```
+
+Upstream version bumps are proposed by [Renovate](renovate.json) from [lemonade-sdk/lemonade](https://github.com/lemonade-sdk/lemonade) releases (updates `VERSION` and the `version:` field in `sdkcraft.yaml`).
+
+To run spread tests in GitHub Actions later, add a `WORKSHOP_TOKEN` secret and vendoring steps per [Canonical’s Workshop in GitHub Actions guide](https://documentation.ubuntu.com/canonical-workshop/latest/how-to/develop-with-workshops/run-workshops-in-github-actions/).
 
 Store upload on merge is stubbed in [`.github/workflows/release.yml`](.github/workflows/release.yml) until the SDK is registered (Phase 4).
 

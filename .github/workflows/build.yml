@@ -1,4 +1,15 @@
-name: Build and test
+# Pack-only CI on GitHub-hosted runners.
+#
+# sdkcraft test is not run here: the workshop spread backend requires a
+# workshop *.snap under tests/, and Workshop remains private (no public snap
+# install / WORKSHOP_TOKEN vendoring on this runner). Run the full spread
+# suite on your build server before merge:
+#   ./scripts/sync-version.sh && sdkcraft test
+#
+# To re-enable tests in GHA later, see:
+# https://documentation.ubuntu.com/canonical-workshop/latest/how-to/develop-with-workshops/run-workshops-in-github-actions/
+
+name: Build
 
 on:
   pull_request:
@@ -14,21 +25,11 @@ jobs:
       - name: Setup LXD
         uses: canonical/setup-lxd@a517a5346a08c624d81953578813a4fc0fe46e0b
 
-      - name: Install Workshop tooling
+      - name: Install sdkcraft
         shell: bash
         run: |
           set -euo pipefail
           sudo snap install sdkcraft --classic
-          sudo snap install workshop --classic
-
-      - name: Allow workshop bridge egress
-        shell: bash
-        run: |
-          set -euo pipefail
-          if command -v ufw >/dev/null 2>&1; then
-            sudo ufw default allow routed || true
-            sudo ufw reload || true
-          fi
 
       - name: Sync version from VERSION
         shell: bash
@@ -42,9 +43,3 @@ jobs:
         run: |
           set -euo pipefail
           sdkcraft pack
-
-      - name: sdkcraft test
-        shell: bash
-        run: |
-          set -euo pipefail
-          sdkcraft test

@@ -22,12 +22,11 @@ jobs:
       - name: Setup LXD
         uses: canonical/setup-lxd@a517a5346a08c624d81953578813a4fc0fe46e0b
 
-      - name: Install Workshop tooling
+      - name: Install sdkcraft
         shell: bash
         run: |
           set -euo pipefail
           sudo snap install sdkcraft --classic
-          sudo snap install workshop --classic
 
       - name: Sync version from VERSION
         shell: bash
