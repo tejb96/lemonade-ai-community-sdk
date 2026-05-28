@@ -1,0 +1,7 @@
+summary: Model pull survives workshop refresh (mount persistence)
+
+execute: |
+  workshop launch ai-dev --verbose --wait-on-error
+  workshop run ai-dev -- pull Qwen3-0.6B-GGUF
+  workshop refresh ai-dev
+  workshop exec ai-dev -- bash -c 'lemonade list | grep Qwen3-0.6B-GGUF'

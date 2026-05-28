@@ -1,0 +1,5 @@
+summary: Workshop launches and reports ready
+
+execute: |
+  workshop launch ai-dev --verbose --wait-on-error
+  workshop info | grep -E 'status:\s+ready'

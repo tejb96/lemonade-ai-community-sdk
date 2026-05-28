@@ -1,0 +1,5 @@
+summary: lemonade CLI is on PATH inside the workshop
+
+execute: |
+  workshop launch ai-dev --verbose --wait-on-error
+  workshop exec ai-dev -- lemonade list

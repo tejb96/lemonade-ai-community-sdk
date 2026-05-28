@@ -1,0 +1,19 @@
+name: ai-dev
+base: ubuntu@24.04
+
+# Consumer workshop for spread tests (sdkcraft test). Uses the try-area
+# artifact produced by sdkcraft pack / try in the test environment.
+
+sdks:
+  - name: try-lemonade-server
+
+  - name: system
+    plugs:
+      lemonade-api:
+        interface: tunnel
+        endpoint: localhost:13305
+
+actions:
+  status: lemonade status
+  pull: lemonade pull "$@"
+  list: lemonade list

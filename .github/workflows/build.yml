@@ -1,0 +1,50 @@
+name: Build and test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup LXD
+        uses: canonical/setup-lxd@a517a5346a08c624d81953578813a4fc0fe46e0b
+
+      - name: Install Workshop tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo snap install sdkcraft --classic
+          sudo snap install workshop --classic
+
+      - name: Allow workshop bridge egress
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v ufw >/dev/null 2>&1; then
+            sudo ufw default allow routed || true
+            sudo ufw reload || true
+          fi
+
+      - name: Sync version from VERSION
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/sync-version.sh
+          ./scripts/sync-version.sh
+
+      - name: sdkcraft pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkcraft pack
+
+      - name: sdkcraft test
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkcraft test

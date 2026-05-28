@@ -1,0 +1,11 @@
+project: lemonade-server
+
+backends:
+  - name: workshop
+    type: workshop
+
+suites:
+  main/:
+    summary: End-to-end lemonade-server SDK scenarios
+    systems:
+      - ubuntu-24.04-64
