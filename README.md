@@ -174,7 +174,8 @@ lemonade-server/
 ├── sdkcraft.yaml
 ├── renovate.json
 ├── scripts/
-│   └── sync-version.sh        # copies VERSION → sdkcraft.yaml version:
+│   ├── sync-version.sh           # copies VERSION → sdkcraft.yaml version:
+│   └── prepare-workshop-snap.sh  # snap download workshop → tests/workshop_<rev>.snap
 ├── service/
 │   └── lemond.service
 ├── hooks/
@@ -283,29 +284,31 @@ workshop refresh ai-dev
 workshop exec ai-dev -- bash -c 'lemonade list | grep Qwen3-0.6B-GGUF'
 ```
 
-The same steps are automated as spread tests under `tests/main/`; run them with:
+The same steps are automated as spread tests under `tests/main/` (LXD backend in `tests/spread.yaml`). On a machine with Workshop and LXD:
 
 ```bash
 ./scripts/sync-version.sh
-sdkcraft test
+./scripts/prepare-workshop-snap.sh   # once per clone / workshop revision
+sdkcraft test -v
 ```
+
+Keep the downloaded file as `tests/workshop_<rev>.snap` (do not rename to `workshop.snap`).
 
 ---
 
 # CI
 
-Pull requests and pushes to `main` run [`.github/workflows/build.yml`](.github/workflows/build.yml): **`sdkcraft pack` only** on an `ubuntu-24.04` runner with LXD. Spread tests are not run on GitHub-hosted runners because `sdkcraft test` needs a local Workshop snap under `tests/` while Workshop remains private.
+Pull requests and pushes to `main` run [`.github/workflows/build.yml`](.github/workflows/build.yml): **`sdkcraft pack` only** on an `ubuntu-24.04` runner with LXD. Spread tests are not run in GitHub Actions (Workshop install and store auth are kept on the build server).
 
-Run the full test gate on your **build server** (where Workshop is installed) before merging:
+Run the full spread suite on your **build server** before merging:
 
 ```bash
 ./scripts/sync-version.sh
-sdkcraft test
+./scripts/prepare-workshop-snap.sh
+sdkcraft test -v
 ```
 
 Upstream version bumps are proposed by [Renovate](renovate.json) from [lemonade-sdk/lemonade](https://github.com/lemonade-sdk/lemonade) releases (updates `VERSION` and the `version:` field in `sdkcraft.yaml`).
-
-To run spread tests in GitHub Actions later, add a `WORKSHOP_TOKEN` secret and vendoring steps per [Canonical’s Workshop in GitHub Actions guide](https://documentation.ubuntu.com/canonical-workshop/latest/how-to/develop-with-workshops/run-workshops-in-github-actions/).
 
 Store upload on merge is stubbed in [`.github/workflows/release.yml`](.github/workflows/release.yml) until the SDK is registered (Phase 4).
 
