@@ -1,0 +1,5 @@
+summary: Health endpoint reachable from host via tunnel
+
+execute: |
+  workshop launch ai-dev --verbose --wait-on-error
+  curl -sf http://127.0.0.1:13305/api/v1/health | grep -q '"status":"ok"'

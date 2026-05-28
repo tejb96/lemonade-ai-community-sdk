@@ -170,7 +170,11 @@ workshop exec ai-dev -- lemonade list
 
 ```text
 lemonade-server/
+├── VERSION                    # upstream Lemonade release (source of truth)
 ├── sdkcraft.yaml
+├── renovate.json
+├── scripts/
+│   └── sync-version.sh        # copies VERSION → sdkcraft.yaml version:
 ├── service/
 │   └── lemond.service
 ├── hooks/
@@ -180,7 +184,13 @@ lemonade-server/
 ├── examples/
 │   └── workshop.yaml
 └── tests/
-    └── spread/
+    ├── spread.yaml
+    ├── workshop.yaml
+    └── main/
+        ├── launch/task.yaml
+        ├── api/task.yaml
+        ├── refresh/task.yaml
+        └── cli/task.yaml
 ```
 
 ---
@@ -246,6 +256,9 @@ sudo nft insert rule ip filter DOCKER-USER oifname workshopbr0 \
 # Verifying a Local Build
 
 ```bash
+# Keep sdkcraft.yaml version in sync with upstream (also run before pack/try/test)
+./scripts/sync-version.sh
+
 # Build and stage locally
 sdkcraft clean && sdkcraft try
 
@@ -269,6 +282,32 @@ workshop refresh ai-dev
 # Verify persistence
 workshop exec ai-dev -- bash -c 'lemonade list | grep Qwen3-0.6B-GGUF'
 ```
+
+The same steps are automated as spread tests under `tests/main/`; run them with:
+
+```bash
+./scripts/sync-version.sh
+sdkcraft test
+```
+
+---
+
+# CI
+
+Pull requests and pushes to `main` run [`.github/workflows/build.yml`](.github/workflows/build.yml): **`sdkcraft pack` only** on an `ubuntu-24.04` runner with LXD. Spread tests are not run on GitHub-hosted runners because `sdkcraft test` needs a local Workshop snap under `tests/` while Workshop remains private.
+
+Run the full test gate on your **build server** (where Workshop is installed) before merging:
+
+```bash
+./scripts/sync-version.sh
+sdkcraft test
+```
+
+Upstream version bumps are proposed by [Renovate](renovate.json) from [lemonade-sdk/lemonade](https://github.com/lemonade-sdk/lemonade) releases (updates `VERSION` and the `version:` field in `sdkcraft.yaml`).
+
+To run spread tests in GitHub Actions later, add a `WORKSHOP_TOKEN` secret and vendoring steps per [Canonical’s Workshop in GitHub Actions guide](https://documentation.ubuntu.com/canonical-workshop/latest/how-to/develop-with-workshops/run-workshops-in-github-actions/).
+
+Store upload on merge is stubbed in [`.github/workflows/release.yml`](.github/workflows/release.yml) until the SDK is registered (Phase 4).
 
 ---
 

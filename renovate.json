@@ -1,0 +1,43 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Lemonade upstream release (VERSION)",
+      "managerFilePatterns": ["^VERSION$"],
+      "matchStrings": ["^(?<currentValue>\\S+)\\s*$"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "lemonade-sdk/lemonade",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "sdkcraft.yaml version field (safety pin)",
+      "managerFilePatterns": ["^sdkcraft\\.yaml$"],
+      "matchStrings": ["^version:\\s*\"(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "lemonade-sdk/lemonade",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Tarball source URL template (safety pin; version comes from CRAFT_PROJECT_VERSION)",
+      "managerFilePatterns": ["^sdkcraft\\.yaml$"],
+      "matchStrings": [
+        "^\\s+source:\\s+https://github\\.com/lemonade-sdk/lemonade/releases/download/v\\$\\{CRAFT_PROJECT_VERSION\\}/lemonade-embeddable-\\$\\{CRAFT_PROJECT_VERSION\\}-ubuntu-x64\\.tar\\.gz"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "lemonade-sdk/lemonade",
+      "versioningTemplate": "semver",
+      "enabled": false
+    }
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["regex"],
+      "matchDepNames": ["lemonade-sdk/lemonade"],
+      "groupName": "lemonade upstream"
+    }
+  ]
+}

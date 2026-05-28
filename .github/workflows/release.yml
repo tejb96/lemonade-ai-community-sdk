@@ -1,0 +1,45 @@
+# Upload to the SDK Store on push to main.
+#
+# Blocked until Phase 4:
+#   1. Operator runs: sdkcraft register (Store name decision)
+#   2. Add repository secret: SDKCRAFT_STORE_TOKEN (or equivalent from sdkcraft login)
+#
+# Then set jobs.release.if to true (or remove the if: false guard) and uncomment upload.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup LXD
+        uses: canonical/setup-lxd@a517a5346a08c624d81953578813a4fc0fe46e0b
+
+      - name: Install sdkcraft
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo snap install sdkcraft --classic
+
+      - name: Sync version from VERSION
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/sync-version.sh
+          ./scripts/sync-version.sh
+
+      - name: Pack and upload
+        shell: bash
+        env:
+          SDKCRAFT_STORE_TOKEN: ${{ secrets.SDKCRAFT_STORE_TOKEN }}
+        run: |
+          set -euo pipefail
+          sdkcraft pack
+          sdkcraft upload --release latest/edge
