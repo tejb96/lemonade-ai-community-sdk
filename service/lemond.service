@@ -1,0 +1,16 @@
+[Unit]
+Description=Lemonade Local LLM Server (lemond)
+Documentation=https://lemonade-server.ai/docs/
+After=network.target
+
+[Service]
+# Run as the workshop user; the cache dir is set via environment so that
+# both the PPA-installed and SDK-managed configs land in the same place.
+Environment=HOME=/home/workshop
+Environment=LEMONADE_CACHE_DIR=/home/workshop/.cache/lemonade
+ExecStart=/bin/bash -lc "lemond /home/workshop/.cache/lemonade"
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

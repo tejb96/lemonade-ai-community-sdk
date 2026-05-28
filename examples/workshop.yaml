@@ -1,0 +1,33 @@
+name: ai-dev
+base: ubuntu@24.04
+
+# A ready-to-code workshop for local LLM inference. Lemonade Server runs as
+# a background user-systemd service on port 13305 with an OpenAI-compatible
+# API, so you can point any OpenAI client at http://localhost:13305/v1.
+
+sdks:
+  - name: lemonade-server
+    channel: latest/edge
+    # During local development before this SDK is published to the SDK Store,
+    # replace the two lines above with:
+    #   - name: try-lemonade-server
+
+  # Expose the Lemonade HTTP API to the host. Declaring a tunnel plug on the
+  # system SDK with the same name as the lemonade-server tunnel slot
+  # ('lemonade-api') triggers Workshop's auto-connect logic at launch.
+  - name: system
+    plugs:
+      lemonade-api:
+        interface: tunnel
+        endpoint: localhost:13305
+
+# Mount and GPU plugs declared by lemonade-server auto-connect to their
+# system-SDK counterparts; no explicit `connections:` entries are needed.
+
+# Useful actions for daily use. Action names must be a single lowercase
+# word; arguments after `workshop run dev -- pull` are forwarded via "$@".
+actions:
+  status: lemonade status
+  pull: lemonade pull "$@"
+  list: lemonade list
+  claude: lemonade launch claude --model Qwen3-0.6B-GGUF

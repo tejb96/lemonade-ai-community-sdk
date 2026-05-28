@@ -1,0 +1,105 @@
+#!/bin/bash
+# setup-project: runs as the 'workshop' user after interfaces are connected.
+# Called on each workshop launch and refresh.
+#
+# At this point:
+#   - The gpu plug (if connected) is live and lspci/GPU detection works.
+#   - The model-cache mount is live (/home/workshop/.cache/lemonade is writable).
+#   - $SDK points to the SDK's installed files.
+#
+# Responsibilities:
+#   1. Detect available compute backend and write a suitable config.json
+#   2. Install the systemd user service unit
+#   3. Enable and start lemond as a user service
+set -euo pipefail
+
+LEMONADE_CACHE="${HOME}/.cache/lemonade"
+CONFIG_FILE="${LEMONADE_CACHE}/config.json"
+SERVICE_DIR="${HOME}/.config/systemd/user"
+SERVICE_SRC="${SDK}/lemond.service"
+
+mkdir -p "${LEMONADE_CACHE}" "${SERVICE_DIR}"
+
+# ── 1. GPU detection ──────────────────────────────────────────────────────────
+GPU_BACKEND="cpu"
+if command -v lspci >/dev/null 2>&1; then
+    if lspci 2>/dev/null | grep -iq 'AMD\|Radeon'; then
+        GPU_BACKEND="rocm"
+    elif lspci 2>/dev/null | grep -iq 'NVIDIA'; then
+        # Lemonade llama.cpp supports Vulkan for NVIDIA on Linux
+        GPU_BACKEND="vulkan"
+    elif lspci 2>/dev/null | grep -iq 'Intel.*Graphics\|Intel.*UHD\|Intel.*Iris'; then
+        GPU_BACKEND="vulkan"
+    fi
+fi
+
+# NPU detection (Ryzen AI / AMD XDNA)
+NPU_BACKEND=""
+if lspci 2>/dev/null | grep -iq 'XDNA\|IPU\|NPU\|AI Engine'; then
+    NPU_BACKEND="npu"
+fi
+
+echo "[lemonade-sdk] Detected GPU backend: ${GPU_BACKEND}"
+[ -n "${NPU_BACKEND}" ] && echo "[lemonade-sdk] Detected NPU backend: npu"
+
+# ── 2. Write config.json (only on first launch or if absent) ──────────────────
+# On refresh we preserve an existing config so users don't lose customisations.
+if [ ! -f "${CONFIG_FILE}" ]; then
+    echo "[lemonade-sdk] Writing default config.json..."
+    cat > "${CONFIG_FILE}" <<EOF
+{
+  "config_version": 1,
+  "port": 13305,
+  "host": "localhost",
+  "log_level": "info",
+  "global_timeout": 300,
+  "max_loaded_models": 1,
+  "models_dir": "auto",
+  "ctx_size": 4096,
+  "offline": false,
+  "llamacpp": {
+    "backend": "${GPU_BACKEND}",
+    "args": "",
+    "cpu_bin": "builtin",
+    "vulkan_bin": "builtin",
+    "rocm_bin": "builtin"
+  },
+  "whispercpp": {
+    "backend": "auto",
+    "cpu_bin": "builtin",
+    "npu_bin": "builtin"
+  },
+  "sdcpp": {
+    "backend": "${GPU_BACKEND}",
+    "steps": 20,
+    "cfg_scale": 7.0,
+    "width": 512,
+    "height": 512,
+    "cpu_bin": "builtin",
+    "rocm_bin": "builtin",
+    "vulkan_bin": "builtin"
+  },
+  "flm": {
+    "args": ""
+  },
+  "ryzenai": {
+    "server_bin": "builtin"
+  },
+  "kokoro": {
+    "cpu_bin": "builtin"
+  }
+}
+EOF
+fi
+
+# ── 3. Install user service ───────────────────────────────────────────────────
+if [ -f "${SERVICE_SRC}" ]; then
+    install -D --mode=644 "${SERVICE_SRC}" "${SERVICE_DIR}/lemond.service"
+else
+    echo "[lemonade-sdk] WARNING: service file not found at ${SERVICE_SRC}"
+fi
+
+systemctl --user daemon-reload
+systemctl --user enable --now lemond
+
+echo "[lemonade-sdk] setup-project complete. Lemonade listening on :13305"

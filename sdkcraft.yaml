@@ -1,0 +1,62 @@
+name: lemonade-server
+build-base: ubuntu@24.04
+title: Lemonade Server SDK
+summary: Local LLM inference server with OpenAI-compatible API (AMD/CPU/NPU)
+description: |
+  Lemonade Server is a lightweight, open-source local LLM inference server.
+  Provides OpenAI-, Ollama-, and Anthropic-compatible REST APIs, a web UI,
+  and support for llama.cpp, FastFlowLM (NPU), RyzenAI, whisper.cpp, and
+  stable-diffusion.cpp backends. Ideal for local AI development and testing.
+version: "10.6.0"
+license: Apache-2.0
+contact: https://github.com/lemonade-sdk/lemonade/issues
+issues: https://github.com/lemonade-sdk/lemonade/issues
+source-code: https://github.com/lemonade-sdk/lemonade
+
+# Phase 1: amd64 only. Upstream Lemonade does not currently publish a Linux
+# arm64 binary or PPA suite; arm64 will be re-introduced once upstream ships
+# one (or once we adopt a source-built part).
+platforms:
+  amd64:
+    build-on: [amd64]
+    build-for: [amd64]
+
+# -- Plugs ------------------------------------------------------------------
+# model-cache:       persists Lemonade's own cache (config.json, user_models.json,
+#                    backends/, models/) across workshop refreshes.
+# huggingface-cache: persists Hugging Face Hub downloads. Lemonade's default
+#                    `models_dir: "auto"` resolves to ~/.cache/huggingface, so
+#                    without this mount weights would be wiped on every refresh.
+# gpu:               auto-connected; enables hardware-accelerated backends
+#                    (ROCm/Vulkan).
+plugs:
+  model-cache:
+    interface: mount
+    workshop-target: /home/workshop/.cache/lemonade
+
+  huggingface-cache:
+    interface: mount
+    workshop-target: /home/workshop/.cache/huggingface
+
+  gpu:
+    interface: gpu
+
+# -- Slots ------------------------------------------------------------------
+# lemonade-api: exposes the Lemonade HTTP server on port 13305. Consumers can
+#               wire this to a system-SDK tunnel plug of the same name to make
+#               it reachable from the host (see examples/workshop.yaml).
+slots:
+  lemonade-api:
+    interface: tunnel
+    endpoint: 13305
+
+# -- Parts ------------------------------------------------------------------
+# Phase 1 keeps the PPA install in setup-base. Phase 2 will replace this with
+# a `dump` part on the upstream lemonade-embeddable Linux tarball, removing
+# the apt dependency entirely. We ship only the systemd user-service unit
+# file as a prebuilt part for now.
+parts:
+  service-files:
+    plugin: dump
+    source: service/
+    source-type: local
