@@ -1,10 +1,11 @@
 # Upload to the SDK Store on push to main.
 #
 # Blocked until Phase 4:
-#   1. Operator runs: sdkcraft register (Store name decision)
+#   1. Operator runs: sdkcraft register lemonade-server-workshop
 #   2. Add repository secret: SDKCRAFT_STORE_TOKEN (or equivalent from sdkcraft login)
+#   3. After merge: sdkcraft upload lemonade-server-workshop_amd64.sdk --release latest/edge
 #
-# Then set jobs.release.if to true (or remove the if: false guard) and uncomment upload.
+# Then set jobs.release.if to true (or remove the if: false guard).
 
 name: Release
 

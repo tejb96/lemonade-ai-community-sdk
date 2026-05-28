@@ -5,7 +5,7 @@ base: ubuntu@24.04
 # artifact produced by sdkcraft pack / try in the test environment.
 
 sdks:
-  - name: try-lemonade-server
+  - name: try-lemonade-server-workshop
 
   - name: system
     plugs:

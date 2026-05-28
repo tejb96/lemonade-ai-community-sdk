@@ -1,4 +1,4 @@
-project: lemonade-server
+project: lemonade-server-workshop
 
 path: /home/ubuntu/project
 
@@ -11,7 +11,7 @@ backends:
 
 suites:
   main/:
-    summary: End-to-end lemonade-server SDK scenarios
+    summary: End-to-end lemonade-server-workshop SDK scenarios
     systems:
       - ubuntu-24.04
     prepare-each: |
