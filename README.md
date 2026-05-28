@@ -31,7 +31,7 @@ sdkcraft try
 This packs the SDK and stages it into the local Workshop "try area" as:
 
 ```text
-try-lemonade-server
+try-lemonade-server-workshop
 ```
 
 ---
@@ -45,7 +45,7 @@ name: ai-dev
 base: ubuntu@24.04
 
 sdks:
-  - name: try-lemonade-server
+  - name: try-lemonade-server-workshop
 
   - name: system
     plugs:
@@ -310,7 +310,7 @@ sdkcraft test -v
 
 Upstream version bumps are proposed by [Renovate](renovate.json) from [lemonade-sdk/lemonade](https://github.com/lemonade-sdk/lemonade) releases (updates `VERSION` and the `version:` field in `sdkcraft.yaml`).
 
-Store upload on merge is stubbed in [`.github/workflows/release.yml`](.github/workflows/release.yml) until the SDK is registered (Phase 4).
+Store upload on merge is stubbed in [`.github/workflows/release.yml`](.github/workflows/release.yml) until the SDK is registered (Phase 4). The Workshop SDK Store name is `lemonade-server-workshop` (`lemonade-server` is reserved on the Store by another publisher).
 
 ---
 

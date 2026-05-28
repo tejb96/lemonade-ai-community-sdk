@@ -10,7 +10,7 @@
 #
 # Note: the profile.d heredoc below is intentionally unquoted (`<<EOF`, not
 # `<<'EOF'`) so ${SDK} expands at hook-run time into the SDK's literal install
-# path (e.g. /var/lib/workshop/sdk/lemonade-server). $SDK is a Workshop
+# path (e.g. /var/lib/workshop/sdk/lemonade-server-workshop). $SDK is a Workshop
 # hook-time variable; it is NOT set in the user-systemd environment, so a
 # quoted heredoc would write the literal "$SDK" into the file and lemond
 # launched via `bash -lc` would fail with "command not found". $PATH is

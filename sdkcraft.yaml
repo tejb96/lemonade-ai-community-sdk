@@ -1,4 +1,4 @@
-name: lemonade-server
+name: lemonade-server-workshop
 build-base: ubuntu@24.04
 title: Lemonade Server SDK
 summary: Local LLM inference server with OpenAI-compatible API (AMD/CPU/NPU)

@@ -6,22 +6,22 @@ base: ubuntu@24.04
 # API, so you can point any OpenAI client at http://localhost:13305/v1.
 
 sdks:
-  - name: try-lemonade-server
+  - name: try-lemonade-server-workshop
     # Defaults to the local try-area artifact produced by `sdkcraft try`.
     # Once this SDK is published to the SDK Store, replace the line above with:
-    #   - name: lemonade-server
+    #   - name: lemonade-server-workshop
     #     channel: latest/edge
 
   # Expose the Lemonade HTTP API to the host. Declaring a tunnel plug on the
-  # system SDK with the same name as the lemonade-server tunnel slot
-  # ('lemonade-api') triggers Workshop's auto-connect logic at launch.
+  # system SDK with the same name as this SDK's tunnel slot ('lemonade-api')
+  # triggers Workshop's auto-connect logic at launch.
   - name: system
     plugs:
       lemonade-api:
         interface: tunnel
         endpoint: localhost:13305
 
-# Mount and GPU plugs declared by lemonade-server auto-connect to their
+# Mount and GPU plugs declared by lemonade-server-workshop auto-connect to their
 # system-SDK counterparts; no explicit `connections:` entries are needed.
 
 # Useful actions for daily use. Action names must be a single lowercase
